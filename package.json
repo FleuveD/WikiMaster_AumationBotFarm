@@ -1,6 +1,6 @@
 {
   "name": "wikimaster_automationbotfarm",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "author": "FleuveD",
   "license": "MIT",
   "main": "src/launcher.js",
