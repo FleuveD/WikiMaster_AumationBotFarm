@@ -1,7 +1,23 @@
 // Common helpers
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const setStatus = (status, color = 'yellow') => {
+    chrome.runtime.sendMessage({ action: 'update_status', status, color });
+};
 
 async function main() {
+    // Init socket connection immediately so status updates work
+    chrome.storage.local.get(['myUsername'], (res) => {
+        chrome.runtime.sendMessage({
+            action: 'init', 
+            role: window.botConfig.type, 
+            botIndex: window.botConfig.botIndex,
+            username: res.myUsername || 'pending'
+        });
+    });
+    
+    // Save bot index early
+    chrome.storage.local.set({ myBotIndex: window.botConfig.botIndex });
+
     // Auto-loop for bot: if it lands on login or home (after logout), redirect to signup
     if (window.botConfig.type === 'bot' && (window.location.pathname === '/login' || window.location.pathname === '/')) {
         console.log("[WikiFarm] Bot landed on " + window.location.pathname + ". Redirecting to /signup for next loop...");
@@ -18,27 +34,43 @@ async function main() {
 }
 
 async function doLogin() {
+    setStatus('LOGGING IN', 'yellow');
     console.log("[WikiFarm] Starting Login sequence for Main Account");
-    // Init socket connection via background script
-    chrome.runtime.sendMessage({
-        action: 'init', 
-        role: window.botConfig.type, 
-        username: window.botConfig.env.MAIN_ACCOUNT_NAME
-    });
+    
+    // Wait for the actual login form to appear (bypassing Cloudflare interstitial)
+    let formAppeared = false;
+    for (let i = 0; i < 60; i++) {
+        if (document.getElementById('email') || document.getElementById('password') || document.querySelector('form')) {
+            formAppeared = true;
+            break;
+        }
+        await sleep(1000);
+    }
+    
+    if (!formAppeared) {
+        console.error("[WikiFarm] Login form never appeared! Stuck on Cloudflare?");
+        return;
+    }
+
+    // Init already done in main()
     chrome.storage.local.set({ myUsername: window.botConfig.env.MAIN_ACCOUNT_NAME, myRole: window.botConfig.type });
 
     await sleep(3000);
     
+    const setReactValue = (element, val) => {
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+        nativeInputValueSetter.call(element, val);
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
     const emailInput = document.getElementById('email');
     if (emailInput) {
-        emailInput.value = window.botConfig.env.MAIN_ACCOUNT_EMAIL;
-        emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+        setReactValue(emailInput, window.botConfig.env.MAIN_ACCOUNT_EMAIL);
     }
 
     const passwordInput = document.getElementById('password');
     if (passwordInput) {
-        passwordInput.value = window.botConfig.env.MAIN_ACCOUNT_PASSWORD;
-        passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+        setReactValue(passwordInput, window.botConfig.env.MAIN_ACCOUNT_PASSWORD);
     }
 
     await sleep(5000);
@@ -58,7 +90,23 @@ async function doLogin() {
 }
 
 async function doSignup() {
+    setStatus('SIGNING UP', 'yellow');
     console.log("[WikiFarm] Starting Signup sequence for", window.botConfig.type);
+    
+    // Wait for the actual signup form to appear (bypassing Cloudflare interstitial)
+    let formAppeared = false;
+    for (let i = 0; i < 60; i++) {
+        if (document.getElementById('username') || document.getElementById('email') || document.querySelector('form')) {
+            formAppeared = true;
+            break;
+        }
+        await sleep(1000);
+    }
+    
+    if (!formAppeared) {
+        console.error("[WikiFarm] Signup form never appeared! Stuck on Cloudflare?");
+        return;
+    }
     
     await sleep(2000);
 
@@ -74,56 +122,73 @@ async function doSignup() {
         const username = "WF_" + randomString.replace(/[^a-zA-Z0-9]/g, '');
         const password = randomString + '123A';
 
-        // Init socket connection
+        // Re-init socket with final username
         chrome.runtime.sendMessage({
             action: 'init', 
             role: window.botConfig.type, 
+            botIndex: window.botConfig.botIndex,
             username: username
         });
         
         // Save auth data and clear old friend flags so a new bot session can re-add targets
         chrome.storage.local.clear(() => {
-            chrome.storage.local.set({ myUsername: username, myRole: window.botConfig.type });
+            chrome.storage.local.set({ 
+                myUsername: username, 
+                myRole: window.botConfig.type,
+                myBotIndex: window.botConfig.botIndex
+            });
         });
+
+        const setReactValue = (element, val) => {
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+            nativeInputValueSetter.call(element, val);
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+        };
 
         // Fill form
         const userInp = document.getElementById('username');
         if (userInp) {
-            userInp.value = username;
-            userInp.dispatchEvent(new Event('input', { bubbles: true }));
+            setReactValue(userInp, username);
         }
 
         const mailInp = document.getElementById('email');
         if (mailInp) {
-            mailInp.value = email;
-            mailInp.dispatchEvent(new Event('input', { bubbles: true }));
+            setReactValue(mailInp, email);
         }
 
         const passInp = document.getElementById('password');
         if (passInp) {
-            passInp.value = password;
-            passInp.dispatchEvent(new Event('input', { bubbles: true }));
+            setReactValue(passInp, password);
         }
 
         const checkboxes = document.querySelectorAll('input[type="checkbox"]');
         checkboxes.forEach(cb => {
-            if (!cb.checked) cb.click();
+            if (!cb.checked) {
+                const label = cb.closest('label');
+                if (label) {
+                    // Clicking the label automatically toggles the checkbox and triggers React's internal state
+                    label.click();
+                } else {
+                    // Fallback to clicking the checkbox directly
+                    cb.click();
+                    cb.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
         });
 
-        // Wait for Cloudflare Turnstile to be solved
-        console.log("[WikiFarm] Waiting for Cloudflare Turnstile...");
-        for (let j = 0; j < 25; j++) {
-            const tsInput = document.querySelector('input[name="cf-turnstile-response"]');
-            // If the input exists and has a value, it's solved!
-            if (tsInput && tsInput.value && tsInput.value.length > 10) {
-                console.log("[WikiFarm] Turnstile solved successfully!");
+        // Wait for Cloudflare Turnstile to be solved and Form to be Validated
+        console.log("[WikiFarm] Waiting for Cloudflare Turnstile & Form Validation...");
+        for (let j = 0; j < 30; j++) {
+            const submitBtn = Array.from(document.querySelectorAll('button')).find(el => el.textContent.includes('Créer mon compte') || el.textContent.includes('S\'inscrire'));
+            if (submitBtn && !submitBtn.disabled) {
+                console.log("[WikiFarm] Turnstile solved & Submit button is enabled!");
                 break;
             }
             
-            // If there's no turnstile widget in the DOM at all after 10 seconds, assume it's not required
-            if (!tsInput && j > 10) {
-                console.log("[WikiFarm] No Turnstile detected, proceeding...");
-                break;
+            // If the button still doesn't exist or isn't enabled after 15 seconds, assume we might be stuck
+            if (j > 15 && (!submitBtn || submitBtn.disabled)) {
+                // Keep waiting but log
+                if (j === 16) console.log("[WikiFarm] Still waiting for validation...");
             }
             
             await sleep(1000);
@@ -149,7 +214,8 @@ async function doSignup() {
         await sleep(2000);
 
         // Polling for OTP
-        console.log("[WikiFarm] Waiting for OTP...");
+        setStatus('WAITING FOR OTP', 'yellow');
+    console.log("[WikiFarm] Waiting for OTP...");
         let otp = null;
         for (let i = 0; i < 60; i++) { // wait up to 60s
             await sleep(1000);
@@ -191,7 +257,8 @@ async function doSignup() {
                     console.log("[WikiFarm] Signup complete. Navigating to friends.");
                     window.location.href = 'https://www.wiki-masters.com/friends';
                 } else if (window.botConfig.type === 'intermediate') {
-                    console.log("[WikiFarm] Signup complete. Navigating to friends.");
+                    setStatus('SIGNUP COMPLETE', 'green');
+    console.log("[WikiFarm] Signup complete. Navigating to friends.");
                     window.location.href = 'https://www.wiki-masters.com/friends';
                 }
             }

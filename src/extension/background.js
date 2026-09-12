@@ -3,18 +3,22 @@ import { io } from './socket.io.esm.min.js';
 let socket = null;
 let currentRole = null;
 let currentUsername = null;
+let currentBotIndex = null;
+let lastStatus = null;
+let lastColor = null;
 let mailToken = null;
 let mailAccountId = null;
 let mailAddress = null;
 
 // Connect to Local Express Server
-function connectToServer(role, username) {
+function connectToServer(role, username, botIndex) {
     currentRole = role;
     currentUsername = username;
+    currentBotIndex = botIndex;
 
     if (socket) {
         // If already connected, re-register with the new username
-        socket.emit('register', { role, username });
+        socket.emit('register', { role, username, botIndex });
         return;
     }
     
@@ -24,17 +28,23 @@ function connectToServer(role, username) {
     });
     
     socket.on('connect', () => {
-        console.log('[Background] Connected to local server');
-        socket.emit('register', { role: currentRole, username: currentUsername });
+        if (process.env && process.env.DEBUG === 'true') console.log('[Background] Connected to local server');
+        socket.emit('register', { role: currentRole, username: currentUsername, botIndex: currentBotIndex });
+        if (lastStatus) {
+            socket.emit('update_status', { status: lastStatus, color: lastColor });
+        }
     });
 
     socket.on('friend_request_received', (data) => {
         // We can pass this to content script or store it in chrome.storage
-        chrome.storage.local.get(['friendRequests'], (res) => {
+        chrome.storage.local.get(['friendRequests', 'intermediateState', 'myRole'], (res) => {
             const requests = res.friendRequests || [];
             requests.push(data.username);
             chrome.storage.local.set({ friendRequests: requests });
             
+            // Do not interrupt intermediate if it's currently sending to main
+            if (res.myRole === 'intermediate' && res.intermediateState === 'sending_to_main') return;
+
             // Auto-navigate to /friends to accept it
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 if (tabs.length > 0) {
@@ -45,11 +55,14 @@ function connectToServer(role, username) {
     });
 
     socket.on('trade_offer_received', (data) => {
-        chrome.storage.local.get(['tradeOffers'], (res) => {
+        chrome.storage.local.get(['tradeOffers', 'intermediateState', 'myRole'], (res) => {
             const offers = res.tradeOffers || [];
             offers.push(data.username);
             chrome.storage.local.set({ tradeOffers: offers });
             
+            // Do not interrupt intermediate if it's currently sending to main
+            if (res.myRole === 'intermediate' && res.intermediateState === 'sending_to_main') return;
+
             // Auto-navigate to /trades to accept it
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 if (tabs.length > 0) {
@@ -138,7 +151,32 @@ async function fetchOtp() {
 // Message listener from content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'init') {
-        connectToServer(request.role, request.username);
+        connectToServer(request.role, request.username, request.botIndex);
+        sendResponse({ success: true });
+    } else if (request.action === 'update_status') {
+        lastStatus = request.status;
+        lastColor = request.color;
+        
+        if (!socket || !socket.connected) {
+            chrome.storage.local.get(['myRole', 'myUsername', 'myBotIndex'], (res) => {
+                if (res.myRole) {
+                    connectToServer(res.myRole, res.myUsername, res.myBotIndex);
+                }
+            });
+        } else {
+            socket.emit('update_status', { status: request.status, color: request.color });
+        }
+        sendResponse({ success: true });
+    } else if (request.action === 'update_counter') {
+        if (!socket || !socket.connected) {
+            chrome.storage.local.get(['myRole', 'myUsername', 'myBotIndex'], (res) => {
+                if (res.myRole) {
+                    connectToServer(res.myRole, res.myUsername, res.myBotIndex);
+                }
+            });
+        } else {
+            socket.emit('update_counter', { count: request.count });
+        }
         sendResponse({ success: true });
     } else if (request.action === 'create_mail') {
         createMailAccount().then(sendResponse);

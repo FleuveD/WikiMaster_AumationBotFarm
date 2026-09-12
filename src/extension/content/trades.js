@@ -1,7 +1,11 @@
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const setStatus = (status, color = 'yellow') => {
+    chrome.runtime.sendMessage({ action: 'update_status', status, color });
+};
 
 async function main() {
     const role = window.botConfig.type;
+    setStatus('WAITING FOR TRADES', 'yellow');
     console.log(`[WikiFarm] Trades sequence for ${role}`);
 
     // Re-init socket to ensure background script is connected
@@ -21,13 +25,11 @@ async function main() {
         let shouldSendTrade = role === 'bot';
         
         if (role === 'intermediate') {
-            // Check if we reached 50 trades
-            const res = await new Promise(r => chrome.storage.local.get(['tradesCount'], r));
+            const res = await new Promise(r => chrome.storage.local.get(['tradesCount', 'intermediateState'], r));
             const count = res.tradesCount || 0;
-            if (count >= 50) {
-                console.log("[WikiFarm] Intermediate reached 50 trades. Sending to Main.");
+            if (count >= 45 && res.intermediateState === 'sending_to_main') {
+                console.log("[WikiFarm] Intermediate ready to send to Main.");
                 shouldSendTrade = true;
-                chrome.storage.local.set({ tradesCount: 0 }); // reset
             }
         }
 
@@ -53,19 +55,55 @@ async function main() {
 
     // Logic for accepting trades for Main & Intermediate
     if (role === 'main' || role === 'intermediate') {
-        setInterval(() => {
-            chrome.storage.local.get(['tradeOffers'], (res) => {
+        const acceptInterval = setInterval(() => {
+            chrome.storage.local.get(['tradeOffers', 'tradesCount'], (res) => {
+                let currentCount = res.tradesCount || 0;
+                if (role === 'intermediate' && currentCount >= 45) {
+                    if (!window.hasRedirectedToAchievements) {
+                        window.hasRedirectedToAchievements = true;
+                        clearInterval(acceptInterval);
+                        console.log(`[WikiFarm] Intermediate reached ${currentCount} trades. Navigating to achievements...`);
+                        chrome.storage.local.set({ intermediateState: 'sending_to_main' }, () => {
+                            window.location.href = 'https://www.wiki-masters.com/achievements';
+                        });
+                    }
+                    return;
+                }
+
                 const offers = res.tradeOffers || [];
                 if (offers.length > 0) {
                     let remaining = [];
+                    let acceptedThisLoop = 0;
+                    
                     for (let reqUsername of offers) {
+                        // Stop accepting immediately if we reach the limit
+                        if (role === 'intermediate' && (currentCount + acceptedThisLoop) >= 45) {
+                            remaining.push(reqUsername);
+                            continue;
+                        }
+                        
                         let success = acceptTradeOffer(reqUsername, role);
-                        if (!success) {
+                        if (success) {
+                            acceptedThisLoop++;
+                        } else {
                             remaining.push(reqUsername);
                         }
                     }
-                    if (remaining.length !== offers.length) {
-                        chrome.storage.local.set({ tradeOffers: remaining });
+                    
+                    if (role === 'intermediate' && acceptedThisLoop > 0) {
+                        currentCount += acceptedThisLoop;
+                        if (window.botConfig && window.botConfig.env && window.botConfig.env.DEBUG) {
+                            console.log(`[WikiFarm] [DEBUG] Accepted ${acceptedThisLoop} offers this loop. Total accepted: ${currentCount}/45`);
+                        }
+                    }
+                    
+                    if (remaining.length !== offers.length || acceptedThisLoop > 0) {
+                        let updates = { tradeOffers: remaining };
+                        if (role === 'intermediate' && acceptedThisLoop > 0) {
+                            updates.tradesCount = currentCount;
+                            chrome.runtime.sendMessage({ action: 'update_counter', count: currentCount });
+                        }
+                        chrome.storage.local.set(updates);
                     }
                 }
             });
@@ -74,6 +112,7 @@ async function main() {
 }
 
 async function sendTradeTo(targetUsername, role) {
+    setStatus('SENDING TRADE', 'green');
     console.log(`[WikiFarm] Sending trade to ${targetUsername}`);
     
     // Proposer un échange
@@ -193,7 +232,11 @@ async function sendTradeTo(targetUsername, role) {
         logoutBtn.click();
         console.log("[WikiFarm] Successfully logged out.");
         
-        if (role === 'bot') {
+        if (role === 'intermediate') {
+            chrome.storage.local.set({ tradesCount: 0, intermediateState: 'farming' });
+        }
+        
+        if (role === 'bot' || role === 'intermediate') {
             setTimeout(() => {
                 console.log("[WikiFarm] Forcing redirect to /signup to restart the loop.");
                 window.location.href = 'https://www.wiki-masters.com/signup';
@@ -220,14 +263,7 @@ function acceptTradeOffer(username, role) {
                 acceptBtn.click();
                 console.log(`[WikiFarm] Accepted trade offer from ${username}`);
                 clicked = true;
-                
-                if (role === 'intermediate') {
-                    // Increment trade count
-                    chrome.storage.local.get(['tradesCount'], (res) => {
-                        const count = res.tradesCount || 0;
-                        chrome.storage.local.set({ tradesCount: count + 1 });
-                    });
-                }
+                // Storage increment has been moved to the main loop to prevent race conditions
             }
         }
     }

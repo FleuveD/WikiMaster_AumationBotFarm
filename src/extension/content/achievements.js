@@ -1,7 +1,7 @@
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 async function main() {
-    if (window.botConfig.type !== 'bot') return;
+    if (window.botConfig.type !== 'bot' && window.botConfig.type !== 'intermediate') return;
     console.log("[WikiFarm] Claiming achievements...");
 
     await sleep(2000);

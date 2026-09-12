@@ -4,7 +4,7 @@ const stealth = require('puppeteer-extra-plugin-stealth')();
 chromium.use(stealth);
 const fs = require('fs-extra');
 const path = require('path');
-const { startServer } = require('./server');
+const { startServer, renderDashboard } = require('./server');
 
 const EXTENSION_SRC = path.join(__dirname, 'extension');
 const TEMP_DIR = path.join(__dirname, '../tmp');
@@ -18,10 +18,12 @@ async function createExtensionCopy(role, index = '') {
     // Create config.js
     const config = {
         type: role,
+        botIndex: index,
         env: {
             MAIN_ACCOUNT_NAME: process.env.MAIN_ACCOUNT_NAME,
             MAIN_ACCOUNT_EMAIL: process.env.MAIN_ACCOUNT_EMAIL,
-            MAIN_ACCOUNT_PASSWORD: process.env.MAIN_ACCOUNT_PASSWORD
+            MAIN_ACCOUNT_PASSWORD: process.env.MAIN_ACCOUNT_PASSWORD,
+            DEBUG: process.env.DEBUG === 'true'
         }
     };
     
@@ -41,7 +43,8 @@ async function launchBrowser(extensionPath, profileName) {
             `--load-extension=${extensionPath}`,
             '--start-maximized',
             '--disable-blink-features=AutomationControlled',
-            '--disable-infobars'
+            '--disable-infobars',
+            '--mute-audio'
         ],
         viewport: null // Required for start-maximized
     });
@@ -51,9 +54,11 @@ async function launchBrowser(extensionPath, profileName) {
     // Capture console logs from this profile
     const setupLogging = (p) => {
         p.on('console', msg => {
-            const text = msg.text();
-            if (text.includes('[WikiFarm]') || text.includes('Error')) {
-                console.log(`[Chrome | ${profileName}] ${text}`);
+            if (process.env.DEBUG === 'true') {
+                const text = msg.text();
+                if (text.includes('[WikiFarm]') || text.includes('Error')) {
+                    console.log(`[Chrome | ${profileName}] ${text}`);
+                }
             }
         });
     };
@@ -62,9 +67,11 @@ async function launchBrowser(extensionPath, profileName) {
     browserContext.on('page', setupLogging);
     browserContext.on('serviceworker', sw => {
         sw.on('console', msg => {
-            const text = msg.text();
-            if (text.includes('[Background]') || text.includes('[WikiFarm]') || text.includes('Error') || msg.type() === 'error') {
-                console.log(`[SW | ${profileName}] ${text}`);
+            if (process.env.DEBUG === 'true') {
+                const text = msg.text();
+                if (text.includes('[Background]') || text.includes('[WikiFarm]') || text.includes('Error') || msg.type() === 'error') {
+                    console.log(`[SW | ${profileName}] ${text}`);
+                }
             }
         });
     });
@@ -73,32 +80,30 @@ async function launchBrowser(extensionPath, profileName) {
     const autoClickCloudflare = async () => {
         while (!page.isClosed()) {
             try {
-                // Find cloudflare frames
-                const frames = page.frames().filter(f => f.url().includes('challenges.cloudflare.com'));
-                for (const frame of frames) {
-                    // Only click if it's the actual Turnstile checkbox (.cb-c or .pUvpD4)
-                    const cb = frame.locator('input[type="checkbox"], .pUvpD4, .cb-c').first();
-                    if (await cb.isVisible({timeout: 500})) {
-                        console.log(`[WikiFarm] Playwright clicking Cloudflare Turnstile for ${profileName}...`);
-                        await cb.click({ delay: Math.random() * 100 + 50 });
-                        await page.waitForTimeout(2000);
-                    }
+                // Find the Turnstile iframe element from the main page
+                const tsIframe = page.locator('iframe[src*="cloudflare"], iframe[src*="turnstile"]').first();
+                const count = await tsIframe.count();
+                
+                if (count > 0 && await tsIframe.isVisible()) {
+                    // Cloudflare Turnstile widget is exactly 300x65. The checkbox is on the left side.
+                    // By clicking the iframe element directly at coordinate x:30, y:30, we bypass any DOM obfuscation inside the frame!
+                    await tsIframe.click({ position: { x: 30, y: 32 }, force: true, delay: Math.random() * 100 + 50 });
+                    if (process.env.DEBUG === 'true') console.log(`[WikiFarm] Playwright clicking Cloudflare Turnstile (coordinate offset) for ${profileName}...`);
                 }
-                await page.waitForTimeout(1000);
-            } catch (e) {
-                // Ignore errors
-                if (page.isClosed()) break;
-            }
+            } catch (e) {}
+            
+            if (page.isClosed()) break;
+            await new Promise(r => setTimeout(r, 2000));
         }
     };
     autoClickCloudflare();
     
     // Auto-loop bots: If a bot is redirected to /login or / (e.g. after logout), redirect to /signup
     page.on('framenavigated', (frame) => {
-        if (frame === page.mainFrame() && profileName.startsWith('bot')) {
+        if (frame === page.mainFrame() && (profileName.startsWith('bot') || profileName === 'intermediate')) {
             const currentUrl = frame.url();
             if (currentUrl.includes('/login') || currentUrl === 'https://www.wiki-masters.com/' || currentUrl === 'https://www.wiki-masters.com') {
-                console.log(`[Chrome | ${profileName}] Detected end of loop (${currentUrl}), redirecting to /signup for next loop...`);
+                if (process.env.DEBUG === 'true') console.log(`[Chrome | ${profileName}] Detected end of loop (${currentUrl}), redirecting to /signup for next loop...`);
                 page.goto('https://www.wiki-masters.com/signup').catch(() => {});
             }
         }
@@ -115,7 +120,7 @@ async function launchBrowser(extensionPath, profileName) {
 }
 
 async function main() {
-    console.log("=== WikiMaster Farm Bot ===");
+    if (process.env.DEBUG === 'true') console.log("=== WikiMaster Farm Bot ===");
     
     // 1. Clean tmp dir
     try {
@@ -131,9 +136,10 @@ async function main() {
     
     // 2. Start Server
     await startServer();
+    renderDashboard();
     
     // 3. Launch Main Account
-    console.log("Starting Main Account...");
+    if (process.env.DEBUG === 'true') console.log("Starting Main Account...");
     const mainExtPath = await createExtensionCopy('main');
     await launchBrowser(mainExtPath, 'main');
     
@@ -141,7 +147,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 5000));
     
     // 4. Launch Intermediate Account
-    console.log("Starting Intermediate Account...");
+    if (process.env.DEBUG === 'true') console.log("Starting Intermediate Account...");
     const interExtPath = await createExtensionCopy('intermediate');
     await launchBrowser(interExtPath, 'intermediate');
     
@@ -154,7 +160,7 @@ async function main() {
             // give intermediate a head start (10 seconds to avoid Mail.tm limit)
             await new Promise(r => setTimeout(r, 10000)); 
         }
-        console.log(`Starting Bot Account ${i}...`);
+        if (process.env.DEBUG === 'true') console.log(`Starting Bot Account ${i}...`);
         const botExtPath = await createExtensionCopy('bot', i);
         await launchBrowser(botExtPath, `bot_${i}`);
         
@@ -164,7 +170,7 @@ async function main() {
         }
     }
     
-    console.log("All bots launched. See server logs for events.");
+    if (process.env.DEBUG === 'true') console.log("All bots launched. See server logs for events.");
 }
 
 main().catch(console.error);

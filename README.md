@@ -46,13 +46,13 @@ The Chrome windows will automatically adapt to your screen resolution. A 10-seco
 To start the automation, ensure that all your standard Chrome windows are closed, then run the following command:
 
 ```bash
-node src/launcher.js
+npm start
 ```
 
 ### What happens when the script starts?
 1. The script cleans the temporary `tmp/` folder.
 2. It starts the local server and opens the defined number of Chrome browsers, staggering them by 10 seconds to bypass API rate limits.
-3. It displays the account status and debug logs in your console.
+3. It displays a color-coded **CLI Dashboard** in your terminal tracking the real-time status of all running accounts (Main, Intermediate, Bots) and the intermediate trade counter.
 4. The main account logs in and waits for friend and trade requests.
 5. The intermediate and bot accounts autonomously sign up using disposable emails and fetch OTP codes.
 6. Bots retrieve their packs, claim achievements, and chain trade offers until all loot is funneled to the intermediate account, and eventually to the main account.

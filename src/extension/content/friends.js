@@ -1,7 +1,11 @@
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const setStatus = (status, color = 'yellow') => {
+    chrome.runtime.sendMessage({ action: 'update_status', status, color });
+};
 
 async function main() {
     const role = window.botConfig.type;
+    setStatus('WAITING FOR FRIEND', 'yellow');
     console.log(`[WikiFarm] Friends sequence for ${role}`);
 
     // Re-init socket to ensure background script is connected
@@ -31,6 +35,7 @@ async function main() {
         }
 
         if (targetUsername) {
+            setStatus('SENDING FRIEND REQUEST', 'green');
             const storageRes = await new Promise(r => chrome.storage.local.get(['friendAdded_' + targetUsername], r));
             if (storageRes['friendAdded_' + targetUsername]) {
                 console.log(`[WikiFarm] Already added ${targetUsername}, skipping friend request.`);
@@ -115,8 +120,9 @@ async function main() {
         // Removed leftover brackets
     }
 
-    // Logic for accepting requests for Main & Intermediate
+    // Logic for accepting requests    // Main and Intermediate wait to accept requests
     if (role === 'main' || role === 'intermediate') {
+        setStatus('ACCEPTING FRIENDS', 'green');
         setInterval(() => {
             chrome.storage.local.get(['friendRequests'], (res) => {
                 const requests = res.friendRequests || [];

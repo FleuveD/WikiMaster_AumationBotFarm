@@ -1,7 +1,11 @@
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const setStatus = (status, color = 'yellow') => {
+    chrome.runtime.sendMessage({ action: 'update_status', status, color });
+};
 
 async function main() {
     if (window.botConfig.type !== 'bot') return;
+    setStatus('OPENING PACKS', 'green');
     console.log("[WikiFarm] Starting Pull sequence for Bot");
 
     // Check for "Vérification rapide" (anti-bot manual check) with a wait loop
