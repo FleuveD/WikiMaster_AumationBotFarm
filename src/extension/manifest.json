@@ -1,0 +1,50 @@
+{
+    "manifest_version": 3,
+    "name": "WikiMaster Farm Bot",
+    "version": "1.0",
+    "description": "Automate farming tasks on WikiMasters",
+    "permissions": [
+        "storage",
+        "tabs"
+    ],
+    "host_permissions": [
+        "*://*.wiki-masters.com/*",
+        "*://api.mail.tm/*",
+        "http://localhost:*/*",
+        "http://127.0.0.1:*/*"
+    ],
+    "background": {
+        "service_worker": "background.js",
+        "type": "module"
+    },
+    "content_scripts": [
+        {
+            "matches": ["*://*.wiki-masters.com/login*", "*://*.wiki-masters.com/signup*"],
+            "js": ["config.js", "content/auth.js"],
+            "run_at": "document_end"
+        },
+        {
+            "matches": ["*://*.wiki-masters.com/pulls*"],
+            "js": ["config.js", "content/pulls.js"],
+            "run_at": "document_idle"
+        },
+        {
+            "matches": ["*://*.wiki-masters.com/achievements*"],
+            "js": ["config.js", "content/achievements.js"],
+            "run_at": "document_idle"
+        },
+        {
+            "matches": ["*://*.wiki-masters.com/friends*"],
+            "js": ["config.js", "content/friends.js"],
+            "run_at": "document_idle"
+        },
+        {
+            "matches": ["*://*.wiki-masters.com/trades*"],
+            "js": ["config.js", "content/trades.js"],
+            "run_at": "document_idle"
+        }
+    ],
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* https://api.mail.tm;"
+    }
+}
