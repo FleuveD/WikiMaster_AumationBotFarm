@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-09-12
+
+### Added
+
+- **Author and License**: Added `author` and `license` fields to `package.json`.
+- **GitHub Repository**: Added `repository` field to `package.json`.
+- **Keywords**: Added `keywords` array to `package.json` for better searchability.
+
 ## [1.0.0] - 2026-09-12
 
 ### Added

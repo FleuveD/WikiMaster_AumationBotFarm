@@ -1,14 +1,31 @@
 {
-  "name": "wikimaster_farm_2",
-  "version": "1.0.0",
-  "main": "index.js",
+  "name": "wikimaster_automationbotfarm",
+  "version": "1.0.1",
+  "author": "FleuveD",
+  "license": "MIT",
+  "main": "src/launcher.js",
   "scripts": {
+    "start": "node src/launcher.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "keywords": [
+    "wikimaster",
+    "wiki-master",
+    "automation",
+    "farm",
+    "bot",
+    "extension",
+    "wikimaster automation",
+    "wikimaster bot",
+    "wikimaster farm",
+    "wikimaster extension",
+    "wikimaster automation bot farm"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FleuveD/WikiMaster_AutomationBotFarm.git"
+  },
+  "description": "Multi-Browser Orchestration for WikiMaster Automation Farm Bot",
   "dependencies": {
     "axios": "^1.20.0",
     "dotenv": "^17.4.2",
