@@ -1,5 +1,9 @@
 # WikiMaster Farm Bot Automation
 
+## Major Issue !
+
+The API for temporary mail as been spoted & the mails used are all blocked. Im actually looking for a new API or a way to create free & temporary mails.
+
 ## 📝 Description
 
 This project is an automated farming bot script for the WikiMaster website. 
