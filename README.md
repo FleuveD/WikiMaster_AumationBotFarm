@@ -12,9 +12,9 @@ It programmatically launches multiple Google Chrome instances with a custom buil
 The system relies on 3 types of account configurations:
 - **1 Main Account**: The destination account. It logs in with your real credentials and automatically accepts friend requests and trade offers (verifying the sender's identity).
 - **1 Intermediate Account**: A temporary account serving as a bridge. It receives the inventory from the farm bots, and after accumulating enough trades, it transfers all its cards and coins to the main account before deleting and recreating itself.
-- **X Bot / Farm Accounts**: Temporary accounts (created with disposable emails via the mail.tm API) that autonomously sign up, solve Cloudflare Turnstile captchas, open card packs, claim achievements, and transfer their entire loot to the intermediate account. Once finished, they log out and restart the cycle infinitely.
+- **X Bot / Farm Accounts**: Temporary accounts (created with disposable emails via the mail.gw API) that autonomously sign up, solve Cloudflare Turnstile captchas, open card packs, claim achievements, and transfer their entire loot to the intermediate account. Once finished, they log out and restart the cycle infinitely.
 
-The Chrome windows will automatically adapt to your screen resolution. A 10-second delay is implemented between each bot launch to respect the Mail.tm API rate limits.
+The Chrome windows will automatically adapt to your screen resolution. A 10-second delay is implemented between each bot launch to respect the mail.gw API rate limits.
 
 ## 🛠️ Prerequisites
 

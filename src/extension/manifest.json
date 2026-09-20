@@ -9,7 +9,7 @@
     ],
     "host_permissions": [
         "*://*.wiki-masters.com/*",
-        "*://api.mail.tm/*",
+        "*://api.mail.gw/*",
         "http://localhost:*/*",
         "http://127.0.0.1:*/*"
     ],
@@ -45,6 +45,6 @@
         }
     ],
     "content_security_policy": {
-        "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* https://api.mail.tm;"
+        "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* https://api.mail.gw;"
     }
 }

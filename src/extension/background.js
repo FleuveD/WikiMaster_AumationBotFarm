@@ -73,12 +73,12 @@ function connectToServer(role, username, botIndex) {
     });
 }
 
-// Mail.tm API Functions
+// Mail.gw API Functions (Hydra compatible)
 async function createMailAccount(retries = 5) {
     for (let i = 0; i < retries; i++) {
         try {
             // 1. Get Domains
-            const domainRes = await fetch('https://api.mail.tm/domains');
+            const domainRes = await fetch('https://api.mail.gw/domains');
             if (!domainRes.ok) throw new Error(`Domains response not OK: ${domainRes.status}`);
             const domains = await domainRes.json();
             const domain = domains['hydra:member'][0].domain;
@@ -88,7 +88,7 @@ async function createMailAccount(retries = 5) {
             mailAddress = `${randomString}@${domain}`;
             const password = randomString + '123!'; // random password
 
-            const accountRes = await fetch('https://api.mail.tm/accounts', {
+            const accountRes = await fetch('https://api.mail.gw/accounts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ address: mailAddress, password })
@@ -98,7 +98,7 @@ async function createMailAccount(retries = 5) {
             mailAccountId = account.id;
 
             // 3. Login to get token
-            const tokenRes = await fetch('https://api.mail.tm/token', {
+            const tokenRes = await fetch('https://api.mail.gw/token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ address: mailAddress, password })
@@ -109,9 +109,8 @@ async function createMailAccount(retries = 5) {
 
             return { email: mailAddress };
         } catch (e) {
-            console.error(`[Background] Error creating mail.tm account (Attempt ${i+1}/${retries}):`, e);
+            console.error(`[Background] Error creating mail.gw account (Attempt ${i+1}/${retries}):`, e);
             if (i < retries - 1) {
-                // Wait between 3 and 8 seconds to stagger requests
                 await new Promise(r => setTimeout(r, 3000 + Math.random() * 5000));
             }
         }
@@ -122,7 +121,7 @@ async function createMailAccount(retries = 5) {
 async function fetchOtp() {
     if (!mailToken) return null;
     try {
-        const messagesRes = await fetch('https://api.mail.tm/messages', {
+        const messagesRes = await fetch('https://api.mail.gw/messages', {
             headers: { 'Authorization': `Bearer ${mailToken}` }
         });
         const messagesData = await messagesRes.json();
@@ -130,7 +129,7 @@ async function fetchOtp() {
         
         if (messages.length > 0) {
             const msgId = messages[0].id;
-            const msgDetailRes = await fetch(`https://api.mail.tm/messages/${msgId}`, {
+            const msgDetailRes = await fetch(`https://api.mail.gw/messages/${msgId}`, {
                 headers: { 'Authorization': `Bearer ${mailToken}` }
             });
             const msgDetail = await msgDetailRes.json();
