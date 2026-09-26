@@ -1,9 +1,5 @@
 # WikiMaster Farm Bot Automation
 
-## Major Issue !
-
-The API for temporary mail as been spoted & the mails used are all blocked. Im actually looking for a new API or a way to create free & temporary mails.
-
 ## 📝 Description
 
 This project is an automated farming bot script for the WikiMaster website. 
@@ -12,9 +8,9 @@ It programmatically launches multiple Google Chrome instances with a custom buil
 The system relies on 3 types of account configurations:
 - **1 Main Account**: The destination account. It logs in with your real credentials and automatically accepts friend requests and trade offers (verifying the sender's identity).
 - **1 Intermediate Account**: A temporary account serving as a bridge. It receives the inventory from the farm bots, and after accumulating enough trades, it transfers all its cards and coins to the main account before deleting and recreating itself.
-- **X Bot / Farm Accounts**: Temporary accounts (created with disposable emails via the mail.gw API) that autonomously sign up, solve Cloudflare Turnstile captchas, open card packs, claim achievements, and transfer their entire loot to the intermediate account. Once finished, they log out and restart the cycle infinitely.
+- **X Bot / Farm Accounts**: Temporary accounts (created with disposable emails via the tempmail.lol API) that autonomously sign up with realistic, randomly generated French pseudonyms (e.g. `loup_`, `mage1491`, `aigle.`), solve Cloudflare Turnstile captchas, open card packs, claim achievements, and transfer their entire loot to the intermediate account. Once finished, they log out and restart the cycle infinitely.
 
-The Chrome windows will automatically adapt to your screen resolution. A 10-second delay is implemented between each bot launch to respect the mail.gw API rate limits.
+The Chrome windows will automatically adapt to your screen resolution. A 10-second delay is implemented between each bot launch to respect the tempmail.lol API rate limits.
 
 ## 🛠️ Prerequisites
 
@@ -58,6 +54,6 @@ npm start
 2. It starts the local server and opens the defined number of Chrome browsers, staggering them by 10 seconds to bypass API rate limits.
 3. It displays a color-coded **CLI Dashboard** in your terminal tracking the real-time status of all running accounts (Main, Intermediate, Bots) and the intermediate trade counter.
 4. The main account logs in and waits for friend and trade requests.
-5. The intermediate and bot accounts autonomously sign up using disposable emails and fetch OTP codes.
+5. The intermediate and bot accounts autonomously sign up using disposable emails and fetch OTP codes. The bot injects the OTP safely into the React-based form, waiting intelligently for the backend validation before proceeding.
 6. Bots retrieve their packs, claim achievements, and chain trade offers until all loot is funneled to the intermediate account, and eventually to the main account.
 7. Bots automatically log out and restart the loop to farm infinitely.

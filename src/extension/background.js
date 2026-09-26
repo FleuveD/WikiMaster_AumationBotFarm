@@ -73,43 +73,20 @@ function connectToServer(role, username, botIndex) {
     });
 }
 
-// Mail.gw API Functions (Hydra compatible)
+// TempMail.lol API Functions
 async function createMailAccount(retries = 5) {
     for (let i = 0; i < retries; i++) {
         try {
-            // 1. Get Domains
-            const domainRes = await fetch('https://api.mail.gw/domains');
-            if (!domainRes.ok) throw new Error(`Domains response not OK: ${domainRes.status}`);
-            const domains = await domainRes.json();
-            const domain = domains['hydra:member'][0].domain;
-
-            // 2. Generate Account
-            const randomString = Math.random().toString(36).substring(2, 12);
-            mailAddress = `${randomString}@${domain}`;
-            const password = randomString + '123!'; // random password
-
-            const accountRes = await fetch('https://api.mail.gw/accounts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ address: mailAddress, password })
-            });
-            if (!accountRes.ok) throw new Error(`Account response not OK: ${accountRes.status}`);
-            const account = await accountRes.json();
-            mailAccountId = account.id;
-
-            // 3. Login to get token
-            const tokenRes = await fetch('https://api.mail.gw/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ address: mailAddress, password })
-            });
+            const tokenRes = await fetch('https://api.tempmail.lol/generate');
             if (!tokenRes.ok) throw new Error(`Token response not OK: ${tokenRes.status}`);
+            
             const tokenData = await tokenRes.json();
             mailToken = tokenData.token;
+            mailAddress = tokenData.address;
 
             return { email: mailAddress };
         } catch (e) {
-            console.error(`[Background] Error creating mail.gw account (Attempt ${i+1}/${retries}):`, e);
+            console.error(`[Background] Error creating tempmail account (Attempt ${i+1}/${retries}):`, e);
             if (i < retries - 1) {
                 await new Promise(r => setTimeout(r, 3000 + Math.random() * 5000));
             }
@@ -121,21 +98,17 @@ async function createMailAccount(retries = 5) {
 async function fetchOtp() {
     if (!mailToken) return null;
     try {
-        const messagesRes = await fetch('https://api.mail.gw/messages', {
-            headers: { 'Authorization': `Bearer ${mailToken}` }
-        });
+        const messagesRes = await fetch(`https://api.tempmail.lol/auth/${mailToken}`);
+        if (!messagesRes.ok) throw new Error(`Messages response not OK: ${messagesRes.status}`);
+        
         const messagesData = await messagesRes.json();
-        const messages = messagesData['hydra:member'];
+        const messages = messagesData.email || [];
         
         if (messages.length > 0) {
-            const msgId = messages[0].id;
-            const msgDetailRes = await fetch(`https://api.mail.gw/messages/${msgId}`, {
-                headers: { 'Authorization': `Bearer ${mailToken}` }
-            });
-            const msgDetail = await msgDetailRes.json();
+            const msgDetail = messages[0];
             
             // Extract OTP from either text or HTML content
-            const contentToSearch = msgDetail.text || msgDetail.html || msgDetail.intro || "";
+            const contentToSearch = msgDetail.body || msgDetail.html || "";
             // Look for 6 consecutive digits
             const match = contentToSearch.match(/\b(\d{6})\b/);
             if (match) return match[1];
