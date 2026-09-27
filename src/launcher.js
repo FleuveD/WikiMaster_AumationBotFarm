@@ -72,12 +72,12 @@ async function launchBrowser(extensionPath, profileName, proxyConfig = undefined
         args: [
             `--disable-extensions-except=${extensionPath}`,
             `--load-extension=${extensionPath}`,
+            '--start-maximized',
             '--disable-blink-features=AutomationControlled',
             '--disable-infobars',
-            '--mute-audio',
-            '--window-position=0,0',
-            '--window-size=800,600'
-        ]
+            '--mute-audio'
+        ],
+        viewport: null
     };
     
     if (proxyConfig) {
