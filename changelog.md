@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-09-27
+
+### Added
+- **Complex Username Generation**: Added the ability to generate complex French pseudonyms using a dictionary of 13,000+ French words. This allows the bot to create more realistic usernames that are less likely to be detected as bots.
+- **Account Database**: Implemented a json file to store account information and status to handle multiple account activities. (will be used to automate account actions)
+
+### Fixed
+- **Temporary Mail API**: Implemented a new temporary mail API (`10minutemail.com`) to replace the previous one (`mail.tm`). This new API is more reliable and easier to use.
+
+
 ## [1.1.0] - 2026-09-12
 
 ### Added
@@ -20,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Intermediate Signup Loop**: Fixed a bug where the intermediate account would not automatically redirect to `/signup` after logging out. Added the `intermediate` profile to the `launcher.js` auto-redirect logic.
 - **Intermediate Achievements Claiming**: Fixed a condition in `achievements.js` so that the intermediate account is correctly allowed to claim its achievements before sending its inventory to the main account.
 
+
 ## [1.0.1] - 2026-09-12
 
 ### Added
@@ -27,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Author and License**: Added `author` and `license` fields to `package.json`.
 - **GitHub Repository**: Added `repository` field to `package.json`.
 - **Keywords**: Added `keywords` array to `package.json` for better searchability.
+
 
 ## [1.0.0] - 2026-09-12
 
