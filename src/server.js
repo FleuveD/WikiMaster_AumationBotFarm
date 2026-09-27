@@ -80,6 +80,38 @@ const io = new Server(server, {
     }
 });
 
+// Proxy routes for Mail API to bypass Chrome Extension CORS issues
+app.get('/api/mail/create', async (req, res) => {
+    try {
+        const fetchRes = await fetch('https://api.tempmail.lol/generate');
+        if (!fetchRes.ok) throw new Error(`Status ${fetchRes.status}`);
+        const data = await fetchRes.json();
+        res.json({ success: true, email: data.address, token: data.token });
+    } catch(e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.get('/api/mail/otp', async (req, res) => {
+    try {
+        const token = req.query.token;
+        const fetchRes = await fetch(`https://api.tempmail.lol/auth/${token}`);
+        if (!fetchRes.ok) throw new Error(`Status ${fetchRes.status}`);
+        const data = await fetchRes.json();
+        const messages = data.email || [];
+        
+        if (messages.length > 0) {
+            const msgDetail = messages[0];
+            const contentToSearch = msgDetail.body || msgDetail.html || "";
+            const match = contentToSearch.match(/\b(\d{6})\b/);
+            if (match) return res.json({ success: true, otp: match[1] });
+        }
+        res.json({ success: true, otp: null });
+    } catch(e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // Registry of connected extensions
 const registry = {
     main: null,        // { socketId, username, status, color }

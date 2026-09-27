@@ -161,9 +161,10 @@ async function main() {
         const botExtPath = await createExtensionCopy('bot', i);
         await launchBrowser(botExtPath, `bot_${i}`);
         
-        // Stagger starts heavily to respect Mail.tm API rate limits
+        // Stagger starts heavily to respect Mail APIs rate limits
         if (i < botCount) {
-            await new Promise(r => setTimeout(r, 10000));
+            if (process.env.DEBUG === 'true') console.log(`Waiting 30 seconds before launching next bot to avoid tempmail rate limits...`);
+            await new Promise(r => setTimeout(r, 30000));
         }
     }
     

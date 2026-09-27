@@ -9,7 +9,7 @@
     ],
     "host_permissions": [
         "*://*.wiki-masters.com/*",
-        "*://api.tempmail.lol/*",
+        "*://api.guerrillamail.com/*",
         "http://localhost:*/*",
         "http://127.0.0.1:*/*"
     ],

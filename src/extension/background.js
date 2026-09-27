@@ -73,22 +73,27 @@ function connectToServer(role, username, botIndex) {
     });
 }
 
-// TempMail.lol API Functions
-async function createMailAccount(retries = 5) {
+// Local Proxy API Functions
+async function createMailAccount(retries = 10) {
     for (let i = 0; i < retries; i++) {
         try {
-            const tokenRes = await fetch('https://api.tempmail.lol/generate');
-            if (!tokenRes.ok) throw new Error(`Token response not OK: ${tokenRes.status}`);
+            // Get a new random email address via local proxy
+            const res = await fetch('http://localhost:3000/api/mail/create');
+            if (!res.ok) throw new Error(`Proxy fetch failed: ${res.status}`);
             
-            const tokenData = await tokenRes.json();
-            mailToken = tokenData.token;
-            mailAddress = tokenData.address;
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+            
+            mailAddress = data.email;
+            mailToken = data.token;
 
             return { email: mailAddress };
         } catch (e) {
-            console.error(`[Background] Error creating tempmail account (Attempt ${i+1}/${retries}):`, e);
+            console.log(`[Background] Error creating account via proxy (Attempt ${i+1}/${retries}): ${e.message}`);
             if (i < retries - 1) {
-                await new Promise(r => setTimeout(r, 3000 + Math.random() * 5000));
+                const delay = (5000 * Math.pow(2, i)) + Math.random() * 5000;
+                console.log(`[Background] Waiting ${Math.round(delay/1000)}s before next attempt...`);
+                await new Promise(r => setTimeout(r, delay));
             }
         }
     }
@@ -98,24 +103,16 @@ async function createMailAccount(retries = 5) {
 async function fetchOtp() {
     if (!mailToken) return null;
     try {
-        const messagesRes = await fetch(`https://api.tempmail.lol/auth/${mailToken}`);
-        if (!messagesRes.ok) throw new Error(`Messages response not OK: ${messagesRes.status}`);
+        const res = await fetch(`http://localhost:3000/api/mail/otp?token=${mailToken}`);
+        if (!res.ok) throw new Error(`Proxy response not OK: ${res.status}`);
         
-        const messagesData = await messagesRes.json();
-        const messages = messagesData.email || [];
-        
-        if (messages.length > 0) {
-            const msgDetail = messages[0];
-            
-            // Extract OTP from either text or HTML content
-            const contentToSearch = msgDetail.body || msgDetail.html || "";
-            // Look for 6 consecutive digits
-            const match = contentToSearch.match(/\b(\d{6})\b/);
-            if (match) return match[1];
+        const data = await res.json();
+        if (data.success && data.otp) {
+            return data.otp;
         }
         return null;
     } catch (e) {
-        console.error("Error fetching OTP:", e);
+        console.error("Error fetching OTP via proxy:", e);
         return null;
     }
 }

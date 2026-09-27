@@ -216,13 +216,14 @@ async function doSignup() {
     // Get email from mail.tm
     chrome.runtime.sendMessage({ action: 'create_mail' }, async (response) => {
         if (!response || !response.email) {
-            console.error("[WikiFarm] Failed to get email");
+            console.error("[WikiFarm] Failed to get email. Reloading page to retry...");
+            setTimeout(() => { window.location.reload(); }, 10000); // Wait 10s before retry
             return;
         }
 
         const email = response.email;
         const randomString = Math.random().toString(36).substring(2, 12);
-        const username = generateRealisticUsername();
+        let username = generateRealisticUsername();
         const password = randomString + '123A';
 
         // Re-init socket with final username
@@ -281,7 +282,37 @@ async function doSignup() {
 
         // Wait for Cloudflare Turnstile to be solved and Form to be Validated
         console.log("[WikiFarm] Waiting for Cloudflare Turnstile & Form Validation...");
-        for (let j = 0; j < 30; j++) {
+        for (let j = 0; j < 60; j++) {
+            // Check for invalid username errors
+            const errorElement = Array.from(document.querySelectorAll('span, p, div, label')).find(el => 
+                el.textContent && (
+                    el.textContent.includes('Impossible de vérifier ce nom') || 
+                    el.textContent.includes('est déjà utilisé') ||
+                    el.textContent.includes('non valide')
+                ) && getComputedStyle(el).display !== 'none'
+            );
+            
+            if (errorElement && !errorElement.closest('button')) {
+                console.log("[WikiFarm] Username error detected:", errorElement.textContent, ". Generating new one...");
+                username = generateRealisticUsername();
+                const uInp = document.getElementById('username');
+                if (uInp) {
+                    setReactValue(uInp, username);
+                }
+                
+                // Update registry
+                chrome.runtime.sendMessage({
+                    action: 'init', 
+                    role: window.botConfig.type, 
+                    botIndex: window.botConfig.botIndex,
+                    username: username
+                });
+                chrome.storage.local.set({ myUsername: username });
+                
+                await sleep(2000); // give time for form to re-validate
+                continue;
+            }
+
             const submitBtn = Array.from(document.querySelectorAll('button')).find(el => el.textContent.toLowerCase().includes('mon compte') || el.textContent.includes('S\'inscrire'));
             if (submitBtn && !submitBtn.disabled) {
                 console.log("[WikiFarm] Turnstile solved & Submit button is enabled!");
@@ -291,7 +322,7 @@ async function doSignup() {
             // If the button still doesn't exist or isn't enabled after 15 seconds, assume we might be stuck
             if (j > 15 && (!submitBtn || submitBtn.disabled)) {
                 // Keep waiting but log
-                if (j === 16) console.log("[WikiFarm] Still waiting for validation...");
+                if (j % 5 === 0) console.log("[WikiFarm] Still waiting for validation...");
             }
             
             await sleep(1000);
