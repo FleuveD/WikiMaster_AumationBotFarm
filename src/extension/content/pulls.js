@@ -19,22 +19,39 @@ async function main() {
     }
 
     if (foundPopup) {
-        console.log("[WikiFarm] Manual verification popup detected. Clicking checkbox...");
+        console.log("[WikiFarm] Manual verification popup detected.");
+        
         let verifCheckbox = document.querySelector('input[type="checkbox"]');
         if (verifCheckbox) {
+            console.log("[WikiFarm] Found native checkbox, clicking it...");
             verifCheckbox.click();
-            await sleep(1000);
-            
-            let continueVerifBtn = Array.from(document.querySelectorAll('button')).find(el => el.textContent.trim() === 'Continuer');
-            if (continueVerifBtn && !continueVerifBtn.disabled) {
-                continueVerifBtn.click();
-                console.log("[WikiFarm] Clicked continue on manual verification.");
-            } else if (continueVerifBtn) {
-                console.log("[WikiFarm] Continuer button is still disabled. Forcing click...");
-                continueVerifBtn.disabled = false;
-                continueVerifBtn.click();
-            }
+        } else {
+            console.log("[WikiFarm] No native checkbox found, waiting for Playwright Turnstile solver...");
         }
+        
+        // Wait for the verification to be accepted (either native or Playwright)
+        let continueVerifBtn = null;
+        for (let v = 0; v < 30; v++) { // Wait up to 30 seconds
+            continueVerifBtn = Array.from(document.querySelectorAll('button')).find(el => el.textContent.trim() === 'Continuer');
+            
+            if (continueVerifBtn && !continueVerifBtn.disabled) {
+                console.log("[WikiFarm] Verification passed, Continuer button is ready!");
+                break;
+            }
+            await sleep(1000);
+        }
+        
+        if (continueVerifBtn && !continueVerifBtn.disabled) {
+            continueVerifBtn.click();
+            console.log("[WikiFarm] Clicked continue on manual verification.");
+        } else if (continueVerifBtn) {
+            console.log("[WikiFarm] Continuer button is still disabled. Forcing click...");
+            continueVerifBtn.disabled = false;
+            continueVerifBtn.click();
+        } else {
+            console.log("[WikiFarm] Continuer button not found! Pop-up might have closed by itself.");
+        }
+        
         await sleep(2000); // Wait for the popup to disappear
     }
 
