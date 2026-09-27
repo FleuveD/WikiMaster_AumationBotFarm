@@ -62,6 +62,10 @@ class AccountManager {
             this.save();
         }
     }
+    markAccountDead(username) {
+        this.accounts = this.accounts.filter(a => a.username !== username);
+        this.save();
+    }
     releaseAll() {
         // Reset in_use flags on server restart
         this.accounts.forEach(a => a.in_use = false);
@@ -288,6 +292,12 @@ io.on('connection', (socket) => {
     socket.on('release_account', (data) => {
         const { username } = data;
         accountManager.releaseAccount(username);
+    });
+
+    socket.on('mark_account_dead', (data) => {
+        const { username } = data;
+        if (process.env.DEBUG === 'true') console.log(`[WikiFarm] Marking account dead (unverified email): ${username}`);
+        accountManager.markAccountDead(username);
     });
 });
 

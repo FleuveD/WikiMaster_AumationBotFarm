@@ -182,6 +182,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             socket.emit('release_account', { username: request.username });
         }
         sendResponse({ success: true });
+    } else if (request.action === 'mark_account_dead') {
+        if (socket && socket.connected) {
+            socket.emit('mark_account_dead', { username: request.username });
+        } else {
+            // Need to connect first, then emit
+            chrome.storage.local.get(['myRole', 'myUsername', 'myBotIndex'], (res) => {
+                connectToServer(res.myRole || currentRole, res.myUsername, res.myBotIndex);
+                setTimeout(() => {
+                    socket.emit('mark_account_dead', { username: request.username });
+                }, 1000);
+            });
+        }
+        sendResponse({ success: true });
     } else if (request.action === 'get_target') {
         if (socket && socket.connected) {
             socket.emit('get_target', { role: currentRole }, (res) => {

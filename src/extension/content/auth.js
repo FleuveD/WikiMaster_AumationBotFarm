@@ -188,7 +188,37 @@ async function doBotLogin(account) {
     const submitBtn = Array.from(document.querySelectorAll('button')).find(el => el.textContent.includes('Connexion'));
     if (submitBtn) submitBtn.click();
     
-    await sleep(10000);
+    // Wait and check for unconfirmed email error
+    let loggedIn = false;
+    for (let j = 0; j < 15; j++) {
+        await sleep(1000);
+        
+        // Check for error
+        const errorEl = Array.from(document.querySelectorAll('span, p, div')).find(el => el.textContent.includes("courriel n'a pas encore été confirmée") || el.textContent.includes("Invalid login credentials") || el.textContent.includes("Identifiants invalides"));
+        if (errorEl) {
+            console.error("[WikiFarm] Account dead/unverified/invalid. Removing from DB.");
+            
+            // Mark it as DEAD in the server
+            chrome.runtime.sendMessage({ action: 'mark_account_dead', username: account.username });
+            
+            // Clear current assignment so next reload gets a new one
+            chrome.storage.local.remove(['currentAssignment'], () => {
+                window.location.reload();
+            });
+            return;
+        }
+        
+        // Check if successfully redirected
+        if (window.location.pathname.includes('/friends') || window.location.pathname.includes('/pulls')) {
+            loggedIn = true;
+            break;
+        }
+    }
+
+    if (!loggedIn) {
+        console.log("[WikiFarm] Login taking longer than expected, forcing navigation.");
+    }
+
     window.location.href = 'https://www.wiki-masters.com/friends';
 }
 
