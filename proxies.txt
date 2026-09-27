@@ -1,0 +1,10 @@
+# Liste des proxies pour chaque instance de Chrome
+# Format supportés :
+# ip:port
+# ip:port:username:password
+# http://ip:port
+# http://username:password@ip:port
+
+# Exemples:
+# 192.168.1.100:8080
+# 192.168.1.101:8080:monUser:monPass
