@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "WikiMaster Farm Bot",
-    "version": "1.0",
+    "version": "1.1.1",
     "description": "Automate farming tasks on WikiMasters",
     "permissions": [
         "storage",
@@ -19,28 +19,54 @@
     },
     "content_scripts": [
         {
-            "matches": ["*://*.wiki-masters.com/login*", "*://*.wiki-masters.com/signup*"],
-            "js": ["config.js", "content/auth.js"],
+            "matches": [
+                "*://*.wiki-masters.com/login*",
+                "*://*.wiki-masters.com/signup*"
+            ],
+            "js": [
+                "config.js",
+                "content/auth.js"
+            ],
             "run_at": "document_end"
         },
         {
-            "matches": ["*://*.wiki-masters.com/pulls*"],
-            "js": ["config.js", "content/pulls.js"],
+            "matches": [
+                "*://*.wiki-masters.com/pulls*"
+            ],
+            "js": [
+                "config.js",
+                "content/pulls.js"
+            ],
             "run_at": "document_idle"
         },
         {
-            "matches": ["*://*.wiki-masters.com/achievements*"],
-            "js": ["config.js", "content/achievements.js"],
+            "matches": [
+                "*://*.wiki-masters.com/achievements*"
+            ],
+            "js": [
+                "config.js",
+                "content/achievements.js"
+            ],
             "run_at": "document_idle"
         },
         {
-            "matches": ["*://*.wiki-masters.com/friends*"],
-            "js": ["config.js", "content/friends.js"],
+            "matches": [
+                "*://*.wiki-masters.com/friends*"
+            ],
+            "js": [
+                "config.js",
+                "content/friends.js"
+            ],
             "run_at": "document_idle"
         },
         {
-            "matches": ["*://*.wiki-masters.com/trades*"],
-            "js": ["config.js", "content/trades.js"],
+            "matches": [
+                "*://*.wiki-masters.com/trades*"
+            ],
+            "js": [
+                "config.js",
+                "content/trades.js"
+            ],
             "run_at": "document_idle"
         }
     ],
