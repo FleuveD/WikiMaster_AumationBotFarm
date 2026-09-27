@@ -2,6 +2,75 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const fs = require('fs');
+const path = require('path');
+
+const accountsFile = path.join(__dirname, '..', 'accounts.json');
+
+class AccountManager {
+    constructor() {
+        this.accounts = [];
+        this.load();
+    }
+    load() {
+        try {
+            if (fs.existsSync(accountsFile)) {
+                this.accounts = JSON.parse(fs.readFileSync(accountsFile, 'utf8'));
+            }
+        } catch (e) {
+            console.error("Failed to load accounts.json", e);
+        }
+    }
+    save() {
+        fs.writeFileSync(accountsFile, JSON.stringify(this.accounts, null, 2));
+    }
+    getNextAssignment(role) {
+        /*
+        const now = Date.now();
+        const COOLDOWN_MS = 2 * 60 * 60 * 1000; // 2 hours
+        const available = this.accounts.find(a => a.role === role && (!a.last_used || now - a.last_used > COOLDOWN_MS) && !a.in_use);
+        
+        if (available) {
+            available.in_use = true;
+            return { action: 'LOGIN', account: available };
+        }
+        */
+        
+        const roleCount = this.accounts.filter(a => a.role === role).length;
+        if (roleCount < 5000) {
+            return { action: 'CREATE_NEW' };
+        }
+        return { action: 'WAIT' };
+    }
+    addAccount(accountData) {
+        const existing = this.accounts.find(a => a.username === accountData.username);
+        if (existing) return;
+        this.accounts.push({
+            role: accountData.role,
+            username: accountData.username,
+            password: accountData.password,
+            email: accountData.email,
+            last_used: Date.now(),
+            in_use: true
+        });
+        this.save();
+    }
+    releaseAccount(username) {
+        const acc = this.accounts.find(a => a.username === username);
+        if (acc) {
+            acc.in_use = false;
+            acc.last_used = Date.now();
+            this.save();
+        }
+    }
+    releaseAll() {
+        // Reset in_use flags on server restart
+        this.accounts.forEach(a => a.in_use = false);
+        this.save();
+    }
+}
+const accountManager = new AccountManager();
+accountManager.releaseAll();
 
 const app = express();
 const server = http.createServer(app);
@@ -157,10 +226,37 @@ io.on('connection', (socket) => {
         if (registry.main && registry.main.socketId === socket.id) {
             registry.main = null;
         } else if (registry.intermediate && registry.intermediate.socketId === socket.id) {
+            if (registry.intermediate.username) {
+                accountManager.releaseAccount(registry.intermediate.username);
+            }
             registry.intermediate = null;
         }
         // We do not delete bots on disconnect so their last status remains visible in the dashboard
+        // But we MUST release their account lock!
+        for (let bot of registry.bots.values()) {
+            if (bot.socketId === socket.id && bot.username) {
+                accountManager.releaseAccount(bot.username);
+                // Also clear username so it doesn't get released twice
+                bot.username = null; 
+            }
+        }
         renderDashboard();
+    });
+
+    // Account Persistence API
+    socket.on('get_account_assignment', (data, callback) => {
+        const { role } = data;
+        const assignment = accountManager.getNextAssignment(role);
+        callback(assignment);
+    });
+
+    socket.on('save_account', (data) => {
+        accountManager.addAccount(data);
+    });
+
+    socket.on('release_account', (data) => {
+        const { username } = data;
+        accountManager.releaseAccount(username);
     });
 });
 

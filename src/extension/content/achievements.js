@@ -4,9 +4,20 @@ async function main() {
     if (window.botConfig.type !== 'bot' && window.botConfig.type !== 'intermediate') return;
     console.log("[WikiFarm] Claiming achievements...");
 
-    await sleep(2000);
-
-    const claimBtns = Array.from(document.querySelectorAll('button')).filter(el => el.textContent.includes('Réclamer') && !el.disabled);
+    // Wait for the achievements list to load
+    let claimBtns = [];
+    for (let i = 0; i < 20; i++) {
+        claimBtns = Array.from(document.querySelectorAll('button')).filter(el => {
+            const t = el.textContent.toLowerCase();
+            return (t.includes('réclamer') || t.includes('récupérer') || t.includes('obtenir')) && !el.disabled;
+        });
+        if (claimBtns.length > 0) break;
+        await sleep(500);
+    }
+    
+    if (claimBtns.length === 0) {
+        console.warn("[WikiFarm] No achievements to claim found.");
+    }
     
     for (let btn of claimBtns) {
         btn.click();

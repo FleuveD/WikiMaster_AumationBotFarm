@@ -98,16 +98,8 @@ async function launchBrowser(extensionPath, profileName) {
     };
     autoClickCloudflare();
     
-    // Auto-loop bots: If a bot is redirected to /login or / (e.g. after logout), redirect to /signup
-    page.on('framenavigated', (frame) => {
-        if (frame === page.mainFrame() && (profileName.startsWith('bot') || profileName === 'intermediate')) {
-            const currentUrl = frame.url();
-            if (currentUrl.includes('/login') || currentUrl === 'https://www.wiki-masters.com/' || currentUrl === 'https://www.wiki-masters.com') {
-                if (process.env.DEBUG === 'true') console.log(`[Chrome | ${profileName}] Detected end of loop (${currentUrl}), redirecting to /signup for next loop...`);
-                page.goto('https://www.wiki-masters.com/signup').catch(() => {});
-            }
-        }
-    });
+    // Auto-loop bots: If a bot is redirected to /login or / (e.g. after logout), 
+    // it stays on /login and auth.js will fetch the next assignment and navigate if needed.
     
     // Navigate based on role
     if (profileName === 'main') {

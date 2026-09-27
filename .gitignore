@@ -39,3 +39,4 @@ $RECYCLE.BIN/
 .fuse_hidden*
 .directory
 .Trash-*
+accounts.json

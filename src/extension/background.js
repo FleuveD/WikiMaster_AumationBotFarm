@@ -156,6 +156,35 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === 'fetch_otp') {
         fetchOtp().then(sendResponse);
         return true;
+    } else if (request.action === 'get_account_assignment') {
+        if (socket && socket.connected) {
+            socket.emit('get_account_assignment', { role: request.role }, (res) => {
+                sendResponse(res);
+            });
+            return true;
+        } else {
+            // Need to connect first, then emit
+            chrome.storage.local.get(['myRole', 'myUsername', 'myBotIndex'], (res) => {
+                connectToServer(res.myRole || request.role, res.myUsername, res.myBotIndex);
+                // Wait briefly for connection
+                setTimeout(() => {
+                    socket.emit('get_account_assignment', { role: request.role }, (assignment) => {
+                        sendResponse(assignment);
+                    });
+                }, 1000);
+            });
+            return true;
+        }
+    } else if (request.action === 'save_account') {
+        if (socket && socket.connected) {
+            socket.emit('save_account', request.accountData);
+        }
+        sendResponse({ success: true });
+    } else if (request.action === 'release_account') {
+        if (socket && socket.connected) {
+            socket.emit('release_account', { username: request.username });
+        }
+        sendResponse({ success: true });
     } else if (request.action === 'get_target') {
         if (socket && socket.connected) {
             socket.emit('get_target', { role: currentRole }, (res) => {
