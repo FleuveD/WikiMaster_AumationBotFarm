@@ -3,56 +3,56 @@ const setStatus = (status, color = 'yellow') => {
     chrome.runtime.sendMessage({ action: 'update_status', status, color });
 };
 
+async function handleVerificationPopup() {
+    let foundPopup = Array.from(document.querySelectorAll('p')).some(p => p.textContent.includes('Vérification rapide'));
+    if (!foundPopup) return false;
+
+    console.log("[WikiFarm] Manual verification popup detected.");
+    
+    let verifCheckbox = document.querySelector('input[type="checkbox"]');
+    if (verifCheckbox) {
+        console.log("[WikiFarm] Found native checkbox, clicking it...");
+        verifCheckbox.click();
+    } else {
+        console.log("[WikiFarm] No native checkbox found, waiting for Playwright Turnstile solver...");
+    }
+    
+    // Wait for the verification to be accepted (either native or Playwright)
+    let continueVerifBtn = null;
+    for (let v = 0; v < 30; v++) { // Wait up to 30 seconds
+        continueVerifBtn = Array.from(document.querySelectorAll('button')).find(el => el.textContent.trim() === 'Continuer');
+        
+        if (continueVerifBtn && !continueVerifBtn.disabled) {
+            console.log("[WikiFarm] Verification passed, Continuer button is ready!");
+            break;
+        }
+        await sleep(1000);
+    }
+    
+    if (continueVerifBtn && !continueVerifBtn.disabled) {
+        continueVerifBtn.click();
+        console.log("[WikiFarm] Clicked continue on manual verification.");
+    } else if (continueVerifBtn) {
+        console.log("[WikiFarm] Continuer button is still disabled. Forcing click...");
+        continueVerifBtn.disabled = false;
+        continueVerifBtn.click();
+    } else {
+        console.log("[WikiFarm] Continuer button not found! Pop-up might have closed by itself.");
+    }
+    
+    await sleep(2000); // Wait for the popup to disappear
+    return true;
+}
+
 async function main() {
     if (window.botConfig.type !== 'bot') return;
     setStatus('OPENING PACKS', 'green');
     console.log("[WikiFarm] Starting Pull sequence for Bot");
 
-    // Check for "Vérification rapide" (anti-bot manual check) with a wait loop
-    let foundPopup = false;
+    // Check for "Vérification rapide" (anti-bot manual check) with a wait loop on page load
     for (let i = 0; i < 20; i++) {
-        if (Array.from(document.querySelectorAll('p')).some(p => p.textContent.includes('Vérification rapide'))) {
-            foundPopup = true;
-            break;
-        }
+        if (await handleVerificationPopup()) break;
         await sleep(200);
-    }
-
-    if (foundPopup) {
-        console.log("[WikiFarm] Manual verification popup detected.");
-        
-        let verifCheckbox = document.querySelector('input[type="checkbox"]');
-        if (verifCheckbox) {
-            console.log("[WikiFarm] Found native checkbox, clicking it...");
-            verifCheckbox.click();
-        } else {
-            console.log("[WikiFarm] No native checkbox found, waiting for Playwright Turnstile solver...");
-        }
-        
-        // Wait for the verification to be accepted (either native or Playwright)
-        let continueVerifBtn = null;
-        for (let v = 0; v < 30; v++) { // Wait up to 30 seconds
-            continueVerifBtn = Array.from(document.querySelectorAll('button')).find(el => el.textContent.trim() === 'Continuer');
-            
-            if (continueVerifBtn && !continueVerifBtn.disabled) {
-                console.log("[WikiFarm] Verification passed, Continuer button is ready!");
-                break;
-            }
-            await sleep(1000);
-        }
-        
-        if (continueVerifBtn && !continueVerifBtn.disabled) {
-            continueVerifBtn.click();
-            console.log("[WikiFarm] Clicked continue on manual verification.");
-        } else if (continueVerifBtn) {
-            console.log("[WikiFarm] Continuer button is still disabled. Forcing click...");
-            continueVerifBtn.disabled = false;
-            continueVerifBtn.click();
-        } else {
-            console.log("[WikiFarm] Continuer button not found! Pop-up might have closed by itself.");
-        }
-        
-        await sleep(2000); // Wait for the popup to disappear
     }
 
     // Loop 10 times to open packs
@@ -62,12 +62,18 @@ async function main() {
         // Find pack button with a 20-second wait loop
         let openBtn = null;
         for (let j = 0; j < 100; j++) { // 100 * 200ms = 20s
+            // Constantly check for popup during waiting
+            await handleVerificationPopup();
+            
             openBtn = document.querySelector('img[alt="Ouvrir un paquet"]')?.closest('button') 
                 || Array.from(document.querySelectorAll('button')).find(el => el.textContent.trim() === 'Ouvrir');
             
             if (openBtn) break;
             await sleep(200);
         }
+
+        // Check one last time before clicking, just in case it popped up
+        await handleVerificationPopup();
 
         if (!openBtn) {
             console.log("[WikiFarm] No pack button found, ending pulls early.");
