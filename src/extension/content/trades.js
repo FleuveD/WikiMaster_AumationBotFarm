@@ -22,9 +22,9 @@ async function main() {
     await sleep(2000);
 
     if (role === 'bot' || role === 'intermediate') {
-        let shouldSendTrade = role === 'bot';
+        let shouldSendTrade = (role === 'bot') && (window.botConfig.env.SEND !== 'false');
         
-        if (role === 'intermediate') {
+        if (role === 'intermediate' && window.botConfig.env.SEND !== 'false') {
             const res = await new Promise(r => chrome.storage.local.get(['tradesCount', 'intermediateState'], r));
             const count = res.tradesCount || 0;
             if (count >= 45 && res.intermediateState === 'sending_to_main') {

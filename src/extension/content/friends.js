@@ -4,6 +4,13 @@ const setStatus = (status, color = 'yellow') => {
 };
 
 async function main() {
+    if (window.botConfig.env.SEND === 'false') {
+        console.log("[WikiFarm] SEND=false. Skipping friend request and navigating to pulls.");
+        await sleep(1000);
+        window.location.href = 'https://www.wiki-masters.com/pulls';
+        return;
+    }
+
     const role = window.botConfig.type;
     setStatus('WAITING FOR FRIEND', 'yellow');
     console.log(`[WikiFarm] Friends sequence for ${role}`);

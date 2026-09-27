@@ -25,7 +25,6 @@ class AccountManager {
         fs.writeFileSync(accountsFile, JSON.stringify(this.accounts, null, 2));
     }
     getNextAssignment(role) {
-        /*
         const now = Date.now();
         const COOLDOWN_MS = 2 * 60 * 60 * 1000; // 2 hours
         const available = this.accounts.find(a => a.role === role && (!a.last_used || now - a.last_used > COOLDOWN_MS) && !a.in_use);
@@ -34,10 +33,10 @@ class AccountManager {
             available.in_use = true;
             return { action: 'LOGIN', account: available };
         }
-        */
         
+        const limit = parseInt(process.env.ACCOUNT_LIMIT) || 2000;
         const roleCount = this.accounts.filter(a => a.role === role).length;
-        if (roleCount < 5000) {
+        if (roleCount < limit) {
             return { action: 'CREATE_NEW' };
         }
         return { action: 'WAIT' };

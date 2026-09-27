@@ -23,7 +23,8 @@ async function createExtensionCopy(role, index = '') {
             MAIN_ACCOUNT_NAME: process.env.MAIN_ACCOUNT_NAME,
             MAIN_ACCOUNT_EMAIL: process.env.MAIN_ACCOUNT_EMAIL,
             MAIN_ACCOUNT_PASSWORD: process.env.MAIN_ACCOUNT_PASSWORD,
-            DEBUG: process.env.DEBUG === 'true'
+            DEBUG: process.env.DEBUG === 'true',
+            SEND: process.env.SEND || 'true'
         }
     };
     
@@ -130,20 +131,24 @@ async function main() {
     await startServer();
     renderDashboard();
     
-    // 3. Launch Main Account
-    if (process.env.DEBUG === 'true') console.log("Starting Main Account...");
-    const mainExtPath = await createExtensionCopy('main');
-    await launchBrowser(mainExtPath, 'main');
-    
-    // wait a bit before starting intermediate to ensure main is ready
-    await new Promise(r => setTimeout(r, 5000));
-    
-    // 4. Launch Intermediate Account
-    if (process.env.DEBUG === 'true') console.log("Starting Intermediate Account...");
-    const interExtPath = await createExtensionCopy('intermediate');
-    await launchBrowser(interExtPath, 'intermediate');
-    
-    await new Promise(r => setTimeout(r, 5000));
+    // 3. Launch Main & Intermediate Accounts if sending is enabled
+    if (process.env.SEND !== 'false') {
+        if (process.env.DEBUG === 'true') console.log("Starting Main Account...");
+        const mainExtPath = await createExtensionCopy('main');
+        await launchBrowser(mainExtPath, 'main');
+        
+        // wait a bit before starting intermediate to ensure main is ready
+        await new Promise(r => setTimeout(r, 5000));
+        
+        // 4. Launch Intermediate Account
+        if (process.env.DEBUG === 'true') console.log("Starting Intermediate Account...");
+        const interExtPath = await createExtensionCopy('intermediate');
+        await launchBrowser(interExtPath, 'intermediate');
+        
+        await new Promise(r => setTimeout(r, 5000));
+    } else {
+        if (process.env.DEBUG === 'true') console.log("SEND=false: Skipping Main and Intermediate accounts.");
+    }
     
     // Start multiple bot farm accounts
     const botCount = parseInt(process.env.BOT_COUNT) || 1;
