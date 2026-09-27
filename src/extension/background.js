@@ -74,36 +74,56 @@ function connectToServer(role, username, botIndex) {
 }
 
 // Local Proxy API Functions
-async function createMailAccount(retries = 10) {
-    for (let i = 0; i < retries; i++) {
-        try {
-            // Get a new random email address via local proxy
-            const res = await fetch('http://localhost:3000/api/mail/create');
-            if (!res.ok) throw new Error(`Proxy fetch failed: ${res.status}`);
-            
-            const data = await res.json();
-            if (!data.success) throw new Error(data.error);
-            
-            mailAddress = data.email;
-            mailToken = data.token;
+let isCreatingMail = false;
+let mailCreationPromise = null;
 
-            return { email: mailAddress };
-        } catch (e) {
-            console.log(`[Background] Error creating account via proxy (Attempt ${i+1}/${retries}): ${e.message}`);
-            if (i < retries - 1) {
-                const delay = (5000 * Math.pow(2, i)) + Math.random() * 5000;
-                console.log(`[Background] Waiting ${Math.round(delay/1000)}s before next attempt...`);
-                await new Promise(r => setTimeout(r, delay));
+async function createMailAccount(retries = 15) {
+    if (isCreatingMail) return mailCreationPromise;
+    isCreatingMail = true;
+    
+    mailCreationPromise = (async () => {
+        for (let i = 0; i < retries; i++) {
+            try {
+                // Get a new random email address via local proxy
+                const res = await fetch('http://localhost:3000/api/mail/create');
+                if (!res.ok) throw new Error(`Proxy fetch failed: ${res.status}`);
+                
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+                
+                mailAddress = data.email;
+                mailToken = data.token;
+                mailProvider = data.provider || 'tempmail.lol';
+                
+                isCreatingMail = false;
+                return { email: mailAddress };
+            } catch (e) {
+                console.log(`[Background] Error creating account via proxy (Attempt ${i+1}/${retries}): ${e.message}`);
+                if (i < retries - 1) {
+                    const delay = 5000 + Math.random() * 5000; // 5s to 10s wait
+                    
+                    if (socket && socket.connected) {
+                        socket.emit('update_status', { status: `MAIL API 500 (RETRY ${i+1})`, color: 'red' });
+                    }
+                    
+                    console.log(`[Background] Waiting ${Math.round(delay/1000)}s before next attempt...`);
+                    await new Promise(r => setTimeout(r, delay));
+                }
             }
         }
-    }
-    return null;
+        isCreatingMail = false;
+        return null;
+    })();
+    
+    return mailCreationPromise;
 }
+
+let mailProvider = 'tempmail.lol';
 
 async function fetchOtp() {
     if (!mailToken) return null;
     try {
-        const res = await fetch(`http://localhost:3000/api/mail/otp?token=${mailToken}`);
+        const res = await fetch(`http://localhost:3000/api/mail/otp?token=${mailToken}&email=${mailAddress}&provider=${mailProvider}`);
         if (!res.ok) throw new Error(`Proxy response not OK: ${res.status}`);
         
         const data = await res.json();

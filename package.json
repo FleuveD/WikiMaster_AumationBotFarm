@@ -6,6 +6,7 @@
   "main": "src/launcher.js",
   "scripts": {
     "start": "node src/launcher.js",
+    "test-mail": "node test-mail.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

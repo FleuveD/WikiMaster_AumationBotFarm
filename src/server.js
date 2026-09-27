@@ -84,32 +84,159 @@ const io = new Server(server, {
     }
 });
 
-// Proxy routes for Mail API to bypass Chrome Extension CORS issues
+// Global mutex for mail creation to avoid rate limiting across all bots
+let mailCreationPromise = null;
+let lastMailCreationTime = 0;
+
 app.get('/api/mail/create', async (req, res) => {
+    // Wait for any ongoing mail creation to finish
+    while (mailCreationPromise) {
+        await mailCreationPromise;
+    }
+
+    let resolveMutex;
+    mailCreationPromise = new Promise(r => resolveMutex = r);
+
     try {
-        const fetchRes = await fetch('https://api.tempmail.lol/generate');
-        if (!fetchRes.ok) throw new Error(`Status ${fetchRes.status}`);
-        const data = await fetchRes.json();
-        res.json({ success: true, email: data.address, token: data.token });
+        // Enforce a minimum delay of 15 seconds between requests across the farm
+        const timeSinceLast = Date.now() - lastMailCreationTime;
+        if (timeSinceLast < 15000) {
+            await new Promise(r => setTimeout(r, 15000 - timeSinceLast));
+        }
+        
+        let result = null;
+
+        // Try tempmail.lol first
+        try {
+            const fetchRes = await fetch('https://api.tempmail.lol/generate');
+            if (fetchRes.ok) {
+                const data = await fetchRes.json();
+                result = { success: true, email: data.address, token: data.token, provider: 'tempmail.lol' };
+            }
+        } catch(e) {}
+
+        // Fallback to mail.tm
+        if (!result) {
+            try {
+                const domainRes = await fetch('https://api.mail.tm/domains');
+                if (domainRes.ok) {
+                    const domainData = await domainRes.json();
+                    const domain = domainData['hydra:member'][0].domain;
+                    
+                    const address = Math.random().toString(36).slice(2, 12) + "@" + domain;
+                    const password = Math.random().toString(36).slice(2, 10) + "aA1!";
+                    
+                    const accountRes = await fetch('https://api.mail.tm/accounts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ address, password })
+                    });
+                    
+                    if (accountRes.ok) {
+                        result = { success: true, email: address, token: password, provider: 'mail.tm' };
+                    }
+                }
+            } catch(e) {}
+        }
+
+        // Fallback to 1secmail
+        if (!result) {
+            try {
+                const fetchRes = await fetch('https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=1');
+                if (fetchRes.ok) {
+                    const data = await fetchRes.json();
+                    result = { success: true, email: data[0], token: data[0], provider: '1secmail' };
+                }
+            } catch(e) {}
+        }
+
+        if (result) {
+            lastMailCreationTime = Date.now();
+            res.json(result);
+        } else {
+            res.status(500).json({ success: false, error: "All mail providers failed or rate-limited" });
+        }
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
+    } finally {
+        resolveMutex();
+        mailCreationPromise = null;
     }
 });
 
 app.get('/api/mail/otp', async (req, res) => {
     try {
         const token = req.query.token;
-        const fetchRes = await fetch(`https://api.tempmail.lol/auth/${token}`);
-        if (!fetchRes.ok) throw new Error(`Status ${fetchRes.status}`);
-        const data = await fetchRes.json();
-        const messages = data.email || [];
+        const email = req.query.email;
+        const provider = req.query.provider || 'tempmail.lol';
         
-        if (messages.length > 0) {
-            const msgDetail = messages[0];
-            const contentToSearch = msgDetail.body || msgDetail.html || "";
+        let contentToSearch = "";
+
+        if (provider === 'mail.tm') {
+            // mail.tm logic
+            // 1. Get bearer token
+            const tokenRes = await fetch("https://api.mail.tm/token", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ address: email, password: token })
+            });
+            if (tokenRes.ok) {
+                const tokenData = await tokenRes.json();
+                const bearer = tokenData.token;
+                
+                // 2. Fetch messages
+                const msgRes = await fetch("https://api.mail.tm/messages", {
+                    headers: { "Authorization": `Bearer ${bearer}` }
+                });
+                if (msgRes.ok) {
+                    const msgData = await msgRes.json();
+                    if (msgData['hydra:member'] && msgData['hydra:member'].length > 0) {
+                        const msgId = msgData['hydra:member'][0].id;
+                        
+                        // 3. Get message content
+                        const detailRes = await fetch(`https://api.mail.tm/messages/${msgId}`, {
+                            headers: { "Authorization": `Bearer ${bearer}` }
+                        });
+                        if (detailRes.ok) {
+                            const detailData = await detailRes.json();
+                            contentToSearch = detailData.html || detailData.text || "";
+                        }
+                    }
+                }
+            }
+        } else if (provider === '1secmail' || token.includes('@')) {
+            // 1secmail logic (token is the email address)
+            const [login, domain] = token.split('@');
+            const listRes = await fetch(`https://www.1secmail.com/api/v1/?action=getMessages&login=${login}&domain=${domain}`);
+            if (listRes.ok) {
+                const messages = await listRes.json();
+                if (messages && messages.length > 0) {
+                    const msgId = messages[0].id;
+                    const msgRes = await fetch(`https://www.1secmail.com/api/v1/?action=readMessage&login=${login}&domain=${domain}&id=${msgId}`);
+                    if (msgRes.ok) {
+                        const msgDetail = await msgRes.json();
+                        contentToSearch = msgDetail.htmlBody || msgDetail.textBody || "";
+                    }
+                }
+            }
+        } else {
+            // tempmail.lol logic
+            const fetchRes = await fetch(`https://api.tempmail.lol/auth/${token}`);
+            if (fetchRes.ok) {
+                const data = await fetchRes.json();
+                const messages = data.email || [];
+                if (messages.length > 0) {
+                    const msgDetail = messages[0];
+                    contentToSearch = msgDetail.body || msgDetail.html || "";
+                }
+            }
+        }
+        
+        if (contentToSearch) {
             const match = contentToSearch.match(/\b(\d{6})\b/);
             if (match) return res.json({ success: true, otp: match[1] });
         }
+
         res.json({ success: true, otp: null });
     } catch(e) {
         res.status(500).json({ success: false, error: e.message });
