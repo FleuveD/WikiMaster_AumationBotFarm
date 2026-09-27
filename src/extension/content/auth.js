@@ -178,7 +178,7 @@ async function doBotLogin(account) {
     };
 
     const emailInput = document.getElementById('email');
-    if (emailInput) setReactValue(emailInput, account.username); // can usually use username in email field
+    if (emailInput) setReactValue(emailInput, account.email);
 
     const passwordInput = document.getElementById('password');
     if (passwordInput) setReactValue(passwordInput, account.password);

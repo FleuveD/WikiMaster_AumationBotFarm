@@ -24,9 +24,51 @@ async function main() {
         await sleep(1000); // 1 sec delay between claims as requested
     }
 
-    console.log("[WikiFarm] Finished claiming achievements. Navigating to trades...");
-    await sleep(1000);
-    window.location.href = 'https://www.wiki-masters.com/trades';
+    if (window.botConfig.env.SEND === 'false') {
+        console.log("[WikiFarm] SEND=false. Logging out directly from achievements...");
+        
+        const settingsLink = document.querySelector('a[href="/settings"]');
+        const paramBtn = Array.from(document.querySelectorAll('a, button, div')).find(el => el.textContent.includes('Paramètres'));
+        
+        if (settingsLink) {
+            settingsLink.click();
+            await sleep(2000);
+        } else if (paramBtn) {
+            paramBtn.click();
+            await sleep(2000);
+        }
+        
+        let logoutBtn = null;
+        for (let i = 0; i < 10; i++) {
+            logoutBtn = Array.from(document.querySelectorAll('*')).find(el => el.children.length === 0 && el.textContent.toLowerCase().includes('déconnexion'));
+            if (logoutBtn) break;
+            await sleep(500);
+        }
+        
+        if (logoutBtn) {
+            const clickable = logoutBtn.closest('button') || logoutBtn.closest('a') || logoutBtn;
+            clickable.click();
+            console.log("[WikiFarm] Successfully logged out.");
+            
+            chrome.storage.local.get(['myUsername'], (res) => {
+                if (res.myUsername) {
+                    chrome.runtime.sendMessage({ action: 'release_account', username: res.myUsername });
+                }
+                chrome.storage.local.remove(['currentAssignment', 'myUsername'], () => {
+                    setTimeout(() => {
+                        window.location.href = 'https://www.wiki-masters.com/login';
+                    }, 2000);
+                });
+            });
+        } else {
+            console.error("[WikiFarm] Logout button not found!");
+            window.location.href = 'https://www.wiki-masters.com/login';
+        }
+    } else {
+        console.log("[WikiFarm] Finished claiming achievements. Navigating to trades...");
+        await sleep(1000);
+        window.location.href = 'https://www.wiki-masters.com/trades';
+    }
 }
 
 main();
