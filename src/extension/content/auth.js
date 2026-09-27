@@ -1,4 +1,4 @@
-﻿// Common helpers
+// Common helpers
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const setStatus = (status, color = 'yellow') => {
     chrome.runtime.sendMessage({ action: 'update_status', status, color });
@@ -282,7 +282,7 @@ async function doSignup() {
         // Wait for Cloudflare Turnstile to be solved and Form to be Validated
         console.log("[WikiFarm] Waiting for Cloudflare Turnstile & Form Validation...");
         for (let j = 0; j < 30; j++) {
-            const submitBtn = Array.from(document.querySelectorAll('button')).find(el => el.textContent.includes('CrÃ©er mon compte') || el.textContent.includes('S\'inscrire'));
+            const submitBtn = Array.from(document.querySelectorAll('button')).find(el => el.textContent.toLowerCase().includes('mon compte') || el.textContent.includes('S\'inscrire'));
             if (submitBtn && !submitBtn.disabled) {
                 console.log("[WikiFarm] Turnstile solved & Submit button is enabled!");
                 break;
@@ -297,7 +297,7 @@ async function doSignup() {
             await sleep(1000);
         }
 
-        const submitBtn = Array.from(document.querySelectorAll('button')).find(el => el.textContent.includes('CrÃ©er mon compte'));
+        const submitBtn = Array.from(document.querySelectorAll('button')).find(el => el.textContent.toLowerCase().includes('mon compte'));
         if (submitBtn) {
             // Wait for button to become enabled
             for (let k = 0; k < 20; k++) {
@@ -306,9 +306,9 @@ async function doSignup() {
             }
             if (!submitBtn.disabled) {
                 submitBtn.click();
-                console.log("[WikiFarm] Clicked 'CrÃ©er mon compte'.");
+                console.log("[WikiFarm] Clicked 'Créer mon compte'.");
             } else {
-                console.error("[WikiFarm] ERROR: 'CrÃ©er mon compte' is STILL DISABLED after Turnstile!");
+                console.error("[WikiFarm] ERROR: 'Créer mon compte' is STILL DISABLED after Turnstile!");
             }
         } else {
             console.error("[WikiFarm] ERROR: Submit button not found!");
@@ -358,12 +358,13 @@ async function doSignup() {
                 
                 // Click Verify button instead of enter
                 const buttons = Array.from(document.querySelectorAll('button'));
-                const verifyBtn = buttons.find(el => 
-                    el.textContent.includes('VÃ©rifier') || 
-                    el.textContent.includes('Confirmer') || 
-                    el.textContent.includes('Valider') ||
-                    (el.textContent.includes('Continuer') && !el.textContent.includes('CrÃ©ation'))
-                );
+                const verifyBtn = buttons.find(el => {
+                    const txt = el.textContent.toLowerCase();
+                    return txt.includes('rifier') || 
+                           txt.includes('confirmer') || 
+                           txt.includes('valider') ||
+                           (txt.includes('continuer') && !txt.includes('ation'));
+                });
                 
                 if (verifyBtn) {
                     verifyBtn.click();
