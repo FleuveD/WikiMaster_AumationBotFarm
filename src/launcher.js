@@ -93,9 +93,7 @@ async function launchBrowser(extensionPath, profileName, proxyConfig = undefined
         const session = await browserContext.newCDPSession(page);
         const { windowId } = await session.send('Browser.getWindowForTarget');
         await session.send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'minimized' } });
-    } catch (e) {
-        if (process.env.DEBUG === 'true') console.log(`[Chrome | ${profileName}] Failed to minimize window: ${e.message}`);
-    }
+    } catch (e) {}
 
     // Capture console logs from this profile
     const setupLogging = (p) => {
