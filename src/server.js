@@ -115,6 +115,17 @@ app.get('/api/mail/create', async (req, res) => {
             }
         } catch(e) {}
 
+        // Fallback to 1secmail (Prioritized over mail.tm because mail.tm is blacklisted)
+        if (!result) {
+            try {
+                const fetchRes = await fetch('https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=1');
+                if (fetchRes.ok) {
+                    const data = await fetchRes.json();
+                    result = { success: true, email: data[0], token: data[0], provider: '1secmail' };
+                }
+            } catch(e) {}
+        }
+
         // Fallback to mail.tm
         if (!result) {
             try {
@@ -135,17 +146,6 @@ app.get('/api/mail/create', async (req, res) => {
                     if (accountRes.ok) {
                         result = { success: true, email: address, token: password, provider: 'mail.tm' };
                     }
-                }
-            } catch(e) {}
-        }
-
-        // Fallback to 1secmail
-        if (!result) {
-            try {
-                const fetchRes = await fetch('https://www.1secmail.com/api/v1/?action=genRandomMailbox&count=1');
-                if (fetchRes.ok) {
-                    const data = await fetchRes.json();
-                    result = { success: true, email: data[0], token: data[0], provider: '1secmail' };
                 }
             } catch(e) {}
         }
